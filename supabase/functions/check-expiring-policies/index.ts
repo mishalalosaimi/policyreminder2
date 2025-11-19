@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.83.0';
+import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -160,50 +161,37 @@ async function sendEmail(options: {
 }) {
   const { from, to, subject, text, smtpHost, smtpPort, smtpUser, smtpPass } = options;
 
-  // Create SMTP connection
-  const conn = await Deno.connect({ hostname: smtpHost, port: smtpPort });
-  
+  const client = new SmtpClient();
+
   try {
-    const encoder = new TextEncoder();
-    const decoder = new TextDecoder();
-    
-    // Helper to read response
-    const readResponse = async () => {
-      const buffer = new Uint8Array(1024);
-      const n = await conn.read(buffer);
-      return n ? decoder.decode(buffer.subarray(0, n)) : '';
-    };
-    
-    // Helper to send command
-    const sendCommand = async (command: string) => {
-      await conn.write(encoder.encode(command + '\r\n'));
-      return await readResponse();
-    };
-    
-    // SMTP conversation
-    await readResponse(); // Read greeting
-    await sendCommand(`EHLO ${smtpHost}`);
-    await sendCommand('AUTH LOGIN');
-    await sendCommand(btoa(smtpUser));
-    await sendCommand(btoa(smtpPass));
-    await sendCommand(`MAIL FROM:<${from}>`);
-    await sendCommand(`RCPT TO:<${to}>`);
-    await sendCommand('DATA');
-    
-    // Send email content
-    const emailContent = [
-      `From: ${from}`,
-      `To: ${to}`,
-      `Subject: ${subject}`,
-      'Content-Type: text/plain; charset=utf-8',
-      '',
-      text,
-      '.',
-    ].join('\r\n');
-    
-    await sendCommand(emailContent);
-    await sendCommand('QUIT');
-  } finally {
-    conn.close();
+    // Connect using TLS for secure ports (465, 587)
+    if (smtpPort === 465) {
+      await client.connectTLS({
+        hostname: smtpHost,
+        port: smtpPort,
+        username: smtpUser,
+        password: smtpPass,
+      });
+    } else {
+      // Use STARTTLS for port 587 or plain connection
+      await client.connect({
+        hostname: smtpHost,
+        port: smtpPort,
+        username: smtpUser,
+        password: smtpPass,
+      });
+    }
+
+    await client.send({
+      from: from,
+      to: to,
+      subject: subject,
+      content: text,
+    });
+
+    await client.close();
+  } catch (error) {
+    console.error('SMTP Error:', error);
+    throw error;
   }
 }
