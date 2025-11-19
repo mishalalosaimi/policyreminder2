@@ -6,7 +6,7 @@ export const Navigation = () => {
   const location = useLocation();
 
   const links = [
-    { to: "/", label: "Policies", icon: FileText },
+    { to: "/", label: "Dashboard", icon: FileText },
     { to: "/settings", label: "Settings", icon: Settings },
   ];
 
