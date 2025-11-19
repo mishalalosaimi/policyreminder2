@@ -72,11 +72,15 @@ Deno.serve(async (req) => {
     // Generate email body
     const emailBody = generateEmailBody(policies as Policy[]);
 
-    // Try to send email via Resend
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    // Get SMTP configuration
+    const smtpHost = Deno.env.get('SMTP_HOST');
+    const smtpPort = Deno.env.get('SMTP_PORT');
+    const smtpUser = Deno.env.get('SMTP_USER');
+    const smtpPass = Deno.env.get('SMTP_PASS');
+    const fromEmail = Deno.env.get('FROM_EMAIL');
 
-    if (!resendApiKey) {
-      console.warn('⚠️ RESEND_API_KEY not configured. Email will be logged to console instead of sending.');
+    if (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !fromEmail) {
+      console.warn('⚠️ SMTP not configured. Email will be logged to console instead of sending.');
       console.log('📧 Email that would have been sent:');
       console.log(`To: ${settings.notification_email}`);
       console.log(`Subject: Policies Expiring in 30 Days`);
@@ -84,45 +88,39 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ 
-          message: 'Email logged to console (RESEND not configured)', 
+          message: 'Email logged to console (SMTP not configured)', 
           policiesCount: policies.length 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
-    // Send email via Resend
-    const resendResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${resendApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: Deno.env.get('FROM_EMAIL') || 'onboarding@resend.dev',
+    // Send email via SMTP
+    try {
+      await sendEmail({
+        from: fromEmail,
         to: settings.notification_email,
         subject: 'Policies Expiring in 30 Days',
         text: emailBody,
-      }),
-    });
+        smtpHost,
+        smtpPort: parseInt(smtpPort),
+        smtpUser,
+        smtpPass,
+      });
 
-    const resendData = await resendResponse.json();
+      console.log('✅ Email sent successfully via SMTP');
 
-    if (!resendResponse.ok) {
-      console.error('Error sending email via Resend:', resendData);
+      return new Response(
+        JSON.stringify({ 
+          message: 'Email sent successfully', 
+          policiesCount: policies.length
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    } catch (emailError) {
+      console.error('Error sending email via SMTP:', emailError);
       throw new Error('Failed to send email');
     }
-
-    console.log('✅ Email sent successfully via Resend');
-
-    return new Response(
-      JSON.stringify({ 
-        message: 'Email sent successfully', 
-        policiesCount: policies.length,
-        emailId: resendData.id 
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-    );
 
   } catch (error) {
     console.error('Error in check-expiring-policies function:', error);
@@ -148,4 +146,64 @@ function generateEmailBody(policies: Policy[]): string {
   });
 
   return body;
+}
+
+async function sendEmail(options: {
+  from: string;
+  to: string;
+  subject: string;
+  text: string;
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  smtpPass: string;
+}) {
+  const { from, to, subject, text, smtpHost, smtpPort, smtpUser, smtpPass } = options;
+
+  // Create SMTP connection
+  const conn = await Deno.connect({ hostname: smtpHost, port: smtpPort });
+  
+  try {
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    
+    // Helper to read response
+    const readResponse = async () => {
+      const buffer = new Uint8Array(1024);
+      const n = await conn.read(buffer);
+      return n ? decoder.decode(buffer.subarray(0, n)) : '';
+    };
+    
+    // Helper to send command
+    const sendCommand = async (command: string) => {
+      await conn.write(encoder.encode(command + '\r\n'));
+      return await readResponse();
+    };
+    
+    // SMTP conversation
+    await readResponse(); // Read greeting
+    await sendCommand(`EHLO ${smtpHost}`);
+    await sendCommand('AUTH LOGIN');
+    await sendCommand(btoa(smtpUser));
+    await sendCommand(btoa(smtpPass));
+    await sendCommand(`MAIL FROM:<${from}>`);
+    await sendCommand(`RCPT TO:<${to}>`);
+    await sendCommand('DATA');
+    
+    // Send email content
+    const emailContent = [
+      `From: ${from}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      text,
+      '.',
+    ].join('\r\n');
+    
+    await sendCommand(emailContent);
+    await sendCommand('QUIT');
+  } finally {
+    conn.close();
+  }
 }
