@@ -1,5 +1,4 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.83.0';
-import { SMTPClient } from 'https://esm.sh/emailjs@4.0.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -96,9 +95,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Send email via SMTP
+    // Send email via raw SMTP over TCP
     try {
-      await sendEmail({
+      await sendEmailRawSMTP({
         from: fromEmail,
         to: settings.notification_email,
         subject: 'Policies Expiring in 30 Days',
@@ -120,7 +119,7 @@ Deno.serve(async (req) => {
       );
     } catch (emailError) {
       console.error('Error sending email via SMTP:', emailError);
-      throw new Error('Failed to send email');
+      throw new Error(`Failed to send email: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`);
     }
 
   } catch (error) {
@@ -149,7 +148,7 @@ function generateEmailBody(policies: Policy[]): string {
   return body;
 }
 
-async function sendEmail(options: {
+async function sendEmailRawSMTP(options: {
   from: string;
   to: string;
   subject: string;
@@ -161,21 +160,80 @@ async function sendEmail(options: {
 }) {
   const { from, to, subject, text, smtpHost, smtpPort, smtpUser, smtpPass } = options;
 
-  const client = new SMTPClient({
-    user: smtpUser,
-    password: smtpPass,
-    host: smtpHost,
-    port: smtpPort,
-    ssl: smtpPort === 465,
-    tls: smtpPort === 587,
-  });
+  let conn;
+  try {
+    // Connect to SMTP server
+    conn = await Deno.connect({
+      hostname: smtpHost,
+      port: smtpPort,
+    });
 
-  const message = await client.sendAsync({
-    text: text,
-    from: from,
-    to: to,
-    subject: subject,
-  });
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    const buffer = new Uint8Array(4096);
 
-  return message;
+    // Helper function to read response
+    const readResponse = async () => {
+      const n = await conn!.read(buffer);
+      if (!n) throw new Error('Connection closed');
+      const response = decoder.decode(buffer.subarray(0, n));
+      console.log('SMTP Response:', response);
+      return response;
+    };
+
+    // Helper function to send command
+    const sendCommand = async (command: string) => {
+      console.log('SMTP Command:', command.trim());
+      await conn!.write(encoder.encode(command + '\r\n'));
+      return await readResponse();
+    };
+
+    // SMTP conversation
+    await readResponse(); // Server greeting
+    await sendCommand(`EHLO ${smtpHost}`);
+    
+    // Start TLS if port 587
+    if (smtpPort === 587) {
+      await sendCommand('STARTTLS');
+      // Upgrade connection to TLS
+      conn = await Deno.startTls(conn, { hostname: smtpHost });
+      await sendCommand(`EHLO ${smtpHost}`);
+    }
+    
+    // Authenticate
+    await sendCommand('AUTH LOGIN');
+    await sendCommand(btoa(smtpUser));
+    await sendCommand(btoa(smtpPass));
+    
+    // Send email
+    await sendCommand(`MAIL FROM:<${from}>`);
+    await sendCommand(`RCPT TO:<${to}>`);
+    await sendCommand('DATA');
+    
+    // Email content
+    const emailContent = [
+      `From: ${from}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'Content-Type: text/plain; charset=utf-8',
+      '',
+      text,
+      '.',
+    ].join('\r\n');
+    
+    await sendCommand(emailContent);
+    await sendCommand('QUIT');
+    
+  } catch (error) {
+    console.error('Raw SMTP error:', error);
+    throw error;
+  } finally {
+    if (conn) {
+      try {
+        conn.close();
+      } catch (e) {
+        // Ignore close errors
+      }
+    }
+  }
 }
