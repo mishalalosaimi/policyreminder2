@@ -1,1 +1,4 @@
 project_id = "xcacorjnlwiiupemmyag"
+
+[functions.check-expiring-policies]
+verify_jwt = false

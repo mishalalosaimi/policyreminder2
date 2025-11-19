@@ -1,0 +1,36 @@
+import { Link, useLocation } from "react-router-dom";
+import { cn } from "@/lib/utils";
+import { FileText, Settings } from "lucide-react";
+
+export const Navigation = () => {
+  const location = useLocation();
+
+  const links = [
+    { to: "/", label: "Policies", icon: FileText },
+    { to: "/settings", label: "Settings", icon: Settings },
+  ];
+
+  return (
+    <nav className="border-b bg-card">
+      <div className="container mx-auto px-4">
+        <div className="flex gap-6 h-14">
+          {links.map(({ to, label, icon: Icon }) => (
+            <Link
+              key={to}
+              to={to}
+              className={cn(
+                "flex items-center gap-2 px-3 border-b-2 transition-colors",
+                location.pathname === to
+                  ? "border-primary text-foreground font-medium"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </nav>
+  );
+};
