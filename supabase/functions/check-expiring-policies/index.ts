@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
         from: fromEmail,
         to: settings.notification_email,
         subject: 'Policies Expiring in 30 Days',
-        text: emailBody,
+        html: emailBody,
         smtpHost,
         smtpPort: parseInt(smtpPort),
         smtpUser,
@@ -133,32 +133,48 @@ Deno.serve(async (req) => {
 });
 
 function generateEmailBody(policies: Policy[]): string {
-  let body = `The following policies expire in 30 days:\n\n`;
+  const policiesHtml = policies.map((policy, index) => `
+    <div style="padding: 12px; border: 1px solid #e5e5e5; border-radius: 8px; margin-bottom: 12px; background-color: #fafafa;">
+      <h3 style="margin-top: 0; font-size: 16px; color: #333;">Policy ${index + 1}</h3>
+      
+      <p><strong>CLIENT NAME:</strong> ${policy.client_name} (${policy.client_status})</p>
+      <p><strong>LINE:</strong> ${policy.line}${policy.line_detail ? ' ' + policy.line_detail : ''}</p>
+      <p><strong>END DATE:</strong> ${policy.end_date}</p>
+      <p><strong>COUNT:</strong> ${policy.count || 'N/A'}</p>
+      <p><strong>CHANNEL:</strong> ${policy.insurer_name} – ${policy.channel_type}</p>
+      
+      <p><strong>CONTACT:</strong> 
+        ${policy.contact_name}  
+        (${policy.contact_phone} – <a href="mailto:${policy.contact_email}">${policy.contact_email}</a>)
+      </p>
+    </div>
+  `).join('');
 
-  policies.forEach((policy, index) => {
-    body += `${index + 1})\n`;
-    body += `CLIENT NAME: ${policy.client_name} (${policy.client_status})\n`;
-    body += `LINE: ${policy.line}${policy.line_detail ? ' ' + policy.line_detail : ''}\n`;
-    body += `END DATE: ${policy.end_date}\n`;
-    body += `COUNT: ${policy.count || 'N/A'}\n`;
-    body += `CHANNEL: ${policy.insurer_name} – ${policy.channel_type}\n`;
-    body += `CONTACT: ${policy.contact_name} (${policy.contact_phone} – ${policy.contact_email})\n\n`;
-  });
+  return `
+    <div style="font-family: Arial, sans-serif; font-size: 15px; color: #222;">
+      <p>Dear User,</p>
 
-  return body;
+      <p>The following insurance policies are <strong>expiring in 30 days</strong>:</p>
+
+      ${policiesHtml}
+
+      <p style="margin-top: 20px;">Best regards,<br>
+      <strong>Your Policy Minder System</strong></p>
+    </div>
+  `;
 }
 
 async function sendEmailRawSMTP(options: {
   from: string;
   to: string;
   subject: string;
-  text: string;
+  html: string;
   smtpHost: string;
   smtpPort: number;
   smtpUser: string;
   smtpPass: string;
 }) {
-  const { from, to, subject, text, smtpHost, smtpPort, smtpUser, smtpPass } = options;
+  const { from, to, subject, html, smtpHost, smtpPort, smtpUser, smtpPass } = options;
 
   let conn;
   try {
@@ -215,9 +231,10 @@ async function sendEmailRawSMTP(options: {
       `From: ${from}`,
       `To: ${to}`,
       `Subject: ${subject}`,
-      'Content-Type: text/plain; charset=utf-8',
+      'MIME-Version: 1.0',
+      'Content-Type: text/html; charset=utf-8',
       '',
-      text,
+      html,
       '.',
     ].join('\r\n');
     
