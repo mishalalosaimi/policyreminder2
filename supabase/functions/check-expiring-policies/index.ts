@@ -133,33 +133,38 @@ Deno.serve(async (req) => {
 });
 
 function generateEmailBody(policies: Policy[]): string {
-  const policiesHtml = policies.map((policy, index) => `
-    <div style="padding: 12px; border: 1px solid #e5e5e5; border-radius: 8px; margin-bottom: 12px; background-color: #fafafa;">
-      <h3 style="margin-top: 0; font-size: 16px; color: #333;">Policy ${index + 1}</h3>
-      
-      <p><strong>CLIENT NAME:</strong> ${policy.client_name} (${policy.client_status})</p>
-      <p><strong>LINE:</strong> ${policy.line}${policy.line_detail ? ' ' + policy.line_detail : ''}</p>
-      <p><strong>END DATE:</strong> ${policy.end_date}</p>
-      <p><strong>COUNT:</strong> ${policy.count || 'N/A'}</p>
-      <p><strong>CHANNEL:</strong> ${policy.insurer_name} – ${policy.channel_type}</p>
-      
-      <p><strong>CONTACT:</strong> 
-        ${policy.contact_name}  
-        (${policy.contact_phone} – <a href="mailto:${policy.contact_email}">${policy.contact_email}</a>)
+  const policiesHtml = policies.map((policy) => `
+    <div style="border: 1px solid #e2e2e2; padding: 16px; border-radius: 8px; margin-bottom: 16px; background: #fafafa;">
+      <h3 style="margin-top: 0; margin-bottom: 12px; font-size: 16px; color: #222;">
+        ${policy.client_name} — ${policy.line}
+      </h3>
+
+      <p style="margin: 4px 0;"><strong>Status:</strong> ${policy.client_status}</p>
+      <p style="margin: 4px 0;"><strong>End Date:</strong> ${policy.end_date}</p>
+      <p style="margin: 4px 0;"><strong>Count:</strong> ${policy.count || 'N/A'}</p>
+      <p style="margin: 4px 0;"><strong>Insurer:</strong> ${policy.insurer_name} – ${policy.channel_type}</p>
+      <p style="margin: 4px 0;">
+        <strong>Contact:</strong> ${policy.contact_name} 
+        (${policy.contact_phone} – 
+        <a href="mailto:${policy.contact_email}">${policy.contact_email}</a>)
       </p>
     </div>
   `).join('');
 
   return `
-    <div style="font-family: Arial, sans-serif; font-size: 15px; color: #222;">
-      <p>Dear User,</p>
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; color: #333;">
 
-      <p>The following insurance policies are <strong>expiring in 30 days</strong>:</p>
+      <p style="font-size: 15px;">Dear Broker,</p>
+
+      <p style="font-size: 15px;">
+        The following insurance policies are <strong>expiring in 30 days</strong>:
+      </p>
 
       ${policiesHtml}
 
-      <p style="margin-top: 20px;">Best regards,<br>
-      <strong>Your Policy Minder System</strong></p>
+      <p style="margin-top: 24px;">Best regards,<br>
+      <strong>Policy Minder</strong></p>
+
     </div>
   `;
 }
