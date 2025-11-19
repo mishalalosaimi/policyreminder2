@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.83.0';
-import { SmtpClient } from "https://deno.land/x/smtp@v0.7.0/mod.ts";
+import { SMTPClient } from 'https://esm.sh/emailjs@4.0.3';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -161,37 +161,21 @@ async function sendEmail(options: {
 }) {
   const { from, to, subject, text, smtpHost, smtpPort, smtpUser, smtpPass } = options;
 
-  const client = new SmtpClient();
+  const client = new SMTPClient({
+    user: smtpUser,
+    password: smtpPass,
+    host: smtpHost,
+    port: smtpPort,
+    ssl: smtpPort === 465,
+    tls: smtpPort === 587,
+  });
 
-  try {
-    // Connect using TLS for secure ports (465, 587)
-    if (smtpPort === 465) {
-      await client.connectTLS({
-        hostname: smtpHost,
-        port: smtpPort,
-        username: smtpUser,
-        password: smtpPass,
-      });
-    } else {
-      // Use STARTTLS for port 587 or plain connection
-      await client.connect({
-        hostname: smtpHost,
-        port: smtpPort,
-        username: smtpUser,
-        password: smtpPass,
-      });
-    }
+  const message = await client.sendAsync({
+    text: text,
+    from: from,
+    to: to,
+    subject: subject,
+  });
 
-    await client.send({
-      from: from,
-      to: to,
-      subject: subject,
-      content: text,
-    });
-
-    await client.close();
-  } catch (error) {
-    console.error('SMTP Error:', error);
-    throw error;
-  }
+  return message;
 }
