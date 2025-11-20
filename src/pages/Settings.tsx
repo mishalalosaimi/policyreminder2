@@ -2,6 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SettingsForm } from "@/components/settings/SettingsForm";
 import { toast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Send } from "lucide-react";
 
 const Settings = () => {
   const queryClient = useQueryClient();
@@ -49,17 +51,61 @@ const Settings = () => {
     },
   });
 
+  const sendTestEmailMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke(
+        "check-expiring-policies",
+        { body: {} }
+      );
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "Test email sent successfully",
+        description: "Check the notification email inbox for the reminder."
+      });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: "Error sending test email", 
+        description: error.message,
+        variant: "destructive" 
+      });
+    },
+  });
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-8 px-4 max-w-2xl">
         <h1 className="text-3xl font-bold mb-8 text-foreground">Settings</h1>
 
-        <div className="bg-card p-6 rounded-lg border shadow-sm">
-          <SettingsForm
-            settings={settings}
-            isLoading={isLoading}
-            onSave={(email) => updateMutation.mutate(email)}
-          />
+        <div className="space-y-6">
+          <div className="bg-card p-6 rounded-lg border shadow-sm">
+            <SettingsForm
+              settings={settings}
+              isLoading={isLoading}
+              onSave={(email) => updateMutation.mutate(email)}
+            />
+          </div>
+
+          <div className="bg-card p-6 rounded-lg border shadow-sm">
+            <h2 className="text-xl font-semibold mb-4 text-foreground">
+              Email Notifications
+            </h2>
+            <p className="text-muted-foreground mb-4">
+              Send a test reminder email to check if your notification settings are working correctly.
+            </p>
+            <Button
+              onClick={() => sendTestEmailMutation.mutate()}
+              disabled={sendTestEmailMutation.isPending || !settings?.notification_email}
+              className="w-full sm:w-auto"
+            >
+              <Send className="mr-2 h-4 w-4" />
+              {sendTestEmailMutation.isPending ? "Sending..." : "Send Test Email"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>
