@@ -8,37 +8,50 @@ import { Send } from "lucide-react";
 const Settings = () => {
   const queryClient = useQueryClient();
 
+  // Fetch user's company_id
+  const { data: companyId } = useQuery({
+    queryKey: ["userCompanyId"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("company_id")
+        .eq("user_id", user.id)
+        .single();
+
+      return profile?.company_id;
+    },
+  });
+
   const { data: settings, isLoading } = useQuery({
     queryKey: ["settings"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("settings")
         .select("*")
-        .single();
+        .maybeSingle();
 
-      if (error) {
-        // If no settings exist, return default
-        if (error.code === "PGRST116") {
-          return { id: "", notification_email: "" };
-        }
-        throw error;
-      }
-      return data;
+      if (error) throw error;
+      return data || { id: "", notification_email: "" };
     },
   });
 
   const updateMutation = useMutation({
     mutationFn: async (email: string) => {
+      if (!companyId) throw new Error("Company ID not found");
+
       if (settings?.id) {
         const { error } = await supabase
           .from("settings")
-          .update({ notification_email: email })
+          .update({ notification_email: email, company_id: companyId })
           .eq("id", settings.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("settings")
-          .insert({ notification_email: email });
+          .insert({ notification_email: email, company_id: companyId });
         if (error) throw error;
       }
     },
