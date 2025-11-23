@@ -14,11 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      companies: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       policies: {
         Row: {
           channel_type: string
           client_name: string
           client_status: string
+          company_id: string | null
           contact_email: string
           contact_name: string
           contact_phone: string
@@ -35,6 +54,7 @@ export type Database = {
           channel_type: string
           client_name: string
           client_status: string
+          company_id?: string | null
           contact_email: string
           contact_name: string
           contact_phone: string
@@ -51,6 +71,7 @@ export type Database = {
           channel_type?: string
           client_name?: string
           client_status?: string
+          company_id?: string | null
           contact_email?: string
           contact_name?: string
           contact_phone?: string
@@ -63,22 +84,76 @@ export type Database = {
           line_detail?: string | null
           notes?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "policies_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          company_id: string
+          created_at: string
+          email: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          email: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       settings: {
         Row: {
+          company_id: string | null
           id: string
           notification_email: string
         }
         Insert: {
+          company_id?: string | null
           id?: string
           notification_email: string
         }
         Update: {
+          company_id?: string | null
           id?: string
           notification_email?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

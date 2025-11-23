@@ -1,5 +1,5 @@
 import { useForm } from "react-hook-form";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,24 @@ interface PolicyFormProps {
 
 export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormProps) => {
   const queryClient = useQueryClient();
+  
+  // Fetch user's company_id
+  const { data: companyId } = useQuery({
+    queryKey: ["userCompanyId"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("company_id")
+        .eq("user_id", user.id)
+        .single();
+
+      return profile?.company_id;
+    },
+  });
+
   const { register, handleSubmit, setValue, watch, reset } = useForm<PolicyInsert>({
     defaultValues: editingPolicy || {
       client_name: "",
@@ -39,14 +57,18 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
 
   const mutation = useMutation({
     mutationFn: async (data: PolicyInsert) => {
+      if (!companyId) throw new Error("Company ID not found");
+
+      const policyData = { ...data, company_id: companyId };
+
       if (editingPolicy) {
         const { error } = await supabase
           .from("policies")
-          .update(data)
+          .update(policyData)
           .eq("id", editingPolicy.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("policies").insert(data);
+        const { error } = await supabase.from("policies").insert(policyData);
         if (error) throw error;
       }
     },
