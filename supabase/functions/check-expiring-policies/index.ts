@@ -31,8 +31,15 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Check if this is a test mode request
-    const body = req.method === 'POST' ? await req.json() : {};
-    const isTestMode = body.testMode === true;
+    let isTestMode = false;
+    try {
+      const body = await req.json();
+      isTestMode = body.testMode === true;
+      console.log('Request body received:', JSON.stringify(body));
+      console.log('Test mode:', isTestMode);
+    } catch (e) {
+      console.log('No request body or invalid JSON, proceeding in normal mode');
+    }
 
     // Calculate target date (30 days from now)
     const today = new Date();
