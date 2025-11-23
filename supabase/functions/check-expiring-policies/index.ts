@@ -32,11 +32,14 @@ Deno.serve(async (req) => {
 
     // Check if this is a test mode request
     let isTestMode = false;
+    let companyId: string | null = null;
     try {
       const body = await req.json();
       isTestMode = body.testMode === true;
+      companyId = body.companyId || null;
       console.log('Request body received:', JSON.stringify(body));
       console.log('Test mode:', isTestMode);
+      console.log('Company ID:', companyId);
     } catch (e) {
       console.log('No request body or invalid JSON, proceeding in normal mode');
     }
@@ -105,10 +108,16 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Get notification email from settings (get first available setting)
-    const { data: settings, error: settingsError } = await supabase
+    // Get notification email from settings (filter by company if provided)
+    let settingsQuery = supabase
       .from('settings')
-      .select('notification_email')
+      .select('notification_email');
+    
+    if (companyId) {
+      settingsQuery = settingsQuery.eq('company_id', companyId);
+    }
+    
+    const { data: settings, error: settingsError } = await settingsQuery
       .limit(1)
       .maybeSingle();
 
@@ -121,6 +130,8 @@ Deno.serve(async (req) => {
       console.error('No notification email configured in settings');
       throw new Error('Notification email not configured');
     }
+
+    console.log('Using notification email:', settings.notification_email);
 
     // Generate email body
     const emailBody = generateEmailBody(policies as Policy[]);
