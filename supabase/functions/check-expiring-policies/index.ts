@@ -56,11 +56,17 @@ Deno.serve(async (req) => {
 
     if (isTestMode) {
       console.log('Test mode enabled - fetching sample policies for demo email');
-      // In test mode, fetch any policies as samples
-      const { data: samplePolicies, error: sampleError } = await supabase
+      // In test mode, fetch policies from the user's company
+      let sampleQuery = supabase
         .from('policies')
         .select('*')
         .limit(3);
+      
+      if (companyId) {
+        sampleQuery = sampleQuery.eq('company_id', companyId);
+      }
+      
+      const { data: samplePolicies, error: sampleError } = await sampleQuery;
 
       if (sampleError) {
         console.error('Error fetching sample policies:', sampleError);
