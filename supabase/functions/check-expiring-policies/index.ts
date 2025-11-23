@@ -30,6 +30,10 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Check if this is a test mode request
+    const body = req.method === 'POST' ? await req.json() : {};
+    const isTestMode = body.testMode === true;
+
     // Calculate target date (30 days from now)
     const today = new Date();
     const targetDate = new Date(today);
@@ -38,24 +42,60 @@ Deno.serve(async (req) => {
 
     console.log(`Checking for policies expiring on ${targetDateString}`);
 
-    // Query policies expiring in 30 days
-    const { data: policies, error: policiesError } = await supabase
-      .from('policies')
-      .select('*')
-      .eq('end_date', targetDateString);
+    let policies: Policy[] = [];
 
-    if (policiesError) {
-      console.error('Error fetching policies:', policiesError);
-      throw policiesError;
-    }
+    if (isTestMode) {
+      console.log('Test mode enabled - fetching sample policies for demo email');
+      // In test mode, fetch any policies as samples
+      const { data: samplePolicies, error: sampleError } = await supabase
+        .from('policies')
+        .select('*')
+        .limit(3);
 
-    console.log(`Found ${policies?.length || 0} policies expiring in 30 days`);
+      if (sampleError) {
+        console.error('Error fetching sample policies:', sampleError);
+      } else if (samplePolicies && samplePolicies.length > 0) {
+        policies = samplePolicies as Policy[];
+        console.log(`Using ${policies.length} sample policies for test email`);
+      } else {
+        // If no policies exist at all, create a mock one
+        policies = [{
+          id: 'test-id',
+          client_name: 'Sample Client',
+          client_status: 'existing',
+          line: 'Medical',
+          line_detail: 'PAR',
+          end_date: targetDateString,
+          count: 50,
+          insurer_name: 'Sample Insurance Co.',
+          channel_type: 'broker',
+          contact_name: 'John Doe',
+          contact_email: 'john.doe@example.com',
+          contact_phone: '+966 50 123 4567'
+        }];
+        console.log('No policies in database - using mock policy for test email');
+      }
+    } else {
+      // Normal mode - query policies expiring in 30 days
+      const { data: expiringPolicies, error: policiesError } = await supabase
+        .from('policies')
+        .select('*')
+        .eq('end_date', targetDateString);
 
-    if (!policies || policies.length === 0) {
-      return new Response(
-        JSON.stringify({ message: 'No policies expiring in 30 days' }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-      );
+      if (policiesError) {
+        console.error('Error fetching policies:', policiesError);
+        throw policiesError;
+      }
+
+      policies = (expiringPolicies || []) as Policy[];
+      console.log(`Found ${policies.length} policies expiring in 30 days`);
+
+      if (policies.length === 0) {
+        return new Response(
+          JSON.stringify({ message: 'No policies expiring in 30 days' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
     }
 
     // Get notification email from settings
@@ -112,7 +152,7 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ 
-          message: 'Email sent successfully', 
+          message: isTestMode ? 'Test email sent successfully' : 'Email sent successfully', 
           policiesCount: policies.length
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
