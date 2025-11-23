@@ -105,14 +105,20 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Get notification email from settings
+    // Get notification email from settings (get first available setting)
     const { data: settings, error: settingsError } = await supabase
       .from('settings')
       .select('notification_email')
-      .single();
+      .limit(1)
+      .maybeSingle();
 
-    if (settingsError || !settings?.notification_email) {
-      console.error('Error fetching settings or no notification email configured:', settingsError);
+    if (settingsError) {
+      console.error('Error fetching settings:', settingsError);
+      throw new Error('Error fetching notification settings');
+    }
+
+    if (!settings?.notification_email) {
+      console.error('No notification email configured in settings');
       throw new Error('Notification email not configured');
     }
 
