@@ -68,7 +68,7 @@ const Settings = () => {
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke(
         "check-expiring-policies",
-        { body: {} }
+        { body: { testMode: true } }
       );
       
       if (error) throw error;
