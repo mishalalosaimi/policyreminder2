@@ -43,6 +43,7 @@ export type Database = {
           contact_phone: string
           count: number | null
           created_at: string
+          documents: string[] | null
           end_date: string
           id: string
           insurer_name: string
@@ -60,6 +61,7 @@ export type Database = {
           contact_phone: string
           count?: number | null
           created_at?: string
+          documents?: string[] | null
           end_date: string
           id?: string
           insurer_name: string
@@ -77,6 +79,7 @@ export type Database = {
           contact_phone?: string
           count?: number | null
           created_at?: string
+          documents?: string[] | null
           end_date?: string
           id?: string
           insurer_name?: string
