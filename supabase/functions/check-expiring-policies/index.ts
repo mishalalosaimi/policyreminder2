@@ -137,7 +137,7 @@ Deno.serve(async (req) => {
       throw new Error('Notification email not configured');
     }
 
-    console.log('Using notification email:', settings.notification_email);
+    console.log('Notification email configured');
 
     // Generate email body
     const emailBody = generateEmailBody(policies as Policy[]);
@@ -150,11 +150,7 @@ Deno.serve(async (req) => {
     const fromEmail = Deno.env.get('FROM_EMAIL');
 
     if (!smtpHost || !smtpPort || !smtpUser || !smtpPass || !fromEmail) {
-      console.warn('⚠️ SMTP not configured. Email will be logged to console instead of sending.');
-      console.log('📧 Email that would have been sent:');
-      console.log(`To: ${settings.notification_email}`);
-      console.log(`Subject: Policies Expiring in 30 Days`);
-      console.log(emailBody);
+      console.warn('⚠️ SMTP not configured. Email would be sent but configuration is missing.');
 
       return new Response(
         JSON.stringify({ 
