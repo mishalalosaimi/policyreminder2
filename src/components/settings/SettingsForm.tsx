@@ -1,22 +1,16 @@
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 interface SettingsFormProps {
-  settings: { id: string; notification_email: string } | undefined;
+  email: string;
+  setEmail: (email: string) => void;
+  hasUnsavedChanges?: boolean;
   isLoading: boolean;
   onSave: (email: string) => void;
 }
 
-export const SettingsForm = ({ settings, isLoading, onSave }: SettingsFormProps) => {
-  const [email, setEmail] = useState("");
-
-  useEffect(() => {
-    if (settings?.notification_email) {
-      setEmail(settings.notification_email);
-    }
-  }, [settings]);
+export const SettingsForm = ({ email, setEmail, hasUnsavedChanges, isLoading, onSave }: SettingsFormProps) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,9 +33,16 @@ export const SettingsForm = ({ settings, isLoading, onSave }: SettingsFormProps)
           placeholder="your-email@example.com"
           required
         />
-        <p className="text-sm text-muted-foreground mt-2">
-          This email will receive reminders for policies expiring in 30 days
-        </p>
+        <div className="space-y-1 mt-2">
+          <p className="text-sm text-muted-foreground">
+            This email will receive reminders for policies expiring in 30 days
+          </p>
+          {hasUnsavedChanges && (
+            <p className="text-sm text-orange-500">
+              ⚠️ Unsaved changes
+            </p>
+          )}
+        </div>
       </div>
 
       <Button type="submit">Save Settings</Button>

@@ -179,7 +179,8 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           message: isTestMode ? 'Test email sent successfully' : 'Email sent successfully', 
-          policiesCount: policies.length
+          policiesCount: policies.length,
+          recipientEmail: settings.notification_email
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
