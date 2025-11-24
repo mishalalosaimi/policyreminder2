@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/hooks/use-toast";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
+import { useState } from "react";
+import { FileText, X, Upload } from "lucide-react";
 
 type Policy = Tables<"policies">;
 type PolicyInsert = TablesInsert<"policies">;
@@ -20,6 +22,8 @@ interface PolicyFormProps {
 
 export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormProps) => {
   const queryClient = useQueryClient();
+  const [uploadedDocuments, setUploadedDocuments] = useState<string[]>(editingPolicy?.documents || []);
+  const [uploading, setUploading] = useState(false);
   
   // Fetch user's company_id
   const { data: companyId } = useQuery({
@@ -55,11 +59,70 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
     },
   });
 
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    const newDocumentUrls: string[] = [];
+
+    try {
+      const policyId = editingPolicy?.id || crypto.randomUUID();
+
+      for (const file of Array.from(files)) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${crypto.randomUUID()}.${fileExt}`;
+        const filePath = `${policyId}/${fileName}`;
+
+        const { error: uploadError, data } = await supabase.storage
+          .from('policy-documents')
+          .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('policy-documents')
+          .getPublicUrl(filePath);
+
+        newDocumentUrls.push(filePath);
+      }
+
+      setUploadedDocuments([...uploadedDocuments, ...newDocumentUrls]);
+      toast({ title: `${files.length} document(s) uploaded successfully` });
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({ title: "Error uploading documents", variant: "destructive" });
+    } finally {
+      setUploading(false);
+      event.target.value = '';
+    }
+  };
+
+  const handleRemoveDocument = async (documentPath: string) => {
+    try {
+      const { error } = await supabase.storage
+        .from('policy-documents')
+        .remove([documentPath]);
+
+      if (error) throw error;
+
+      setUploadedDocuments(uploadedDocuments.filter(doc => doc !== documentPath));
+      toast({ title: "Document removed" });
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast({ title: "Error removing document", variant: "destructive" });
+    }
+  };
+
   const mutation = useMutation({
     mutationFn: async (data: PolicyInsert) => {
       if (!companyId) throw new Error("Company ID not found");
 
-      const policyData = { ...data, company_id: companyId };
+      const policyData = { 
+        ...data, 
+        company_id: companyId,
+        documents: uploadedDocuments.length > 0 ? uploadedDocuments : null
+      };
 
       if (editingPolicy) {
         const { error } = await supabase
@@ -76,6 +139,7 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
       queryClient.invalidateQueries({ queryKey: ["policies"] });
       toast({ title: editingPolicy ? "Policy updated" : "Policy created" });
       reset();
+      setUploadedDocuments([]);
       onSuccess();
     },
     onError: () => {
@@ -183,6 +247,61 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
       <div>
         <Label htmlFor="notes">Notes (optional)</Label>
         <Textarea id="notes" {...register("notes")} />
+      </div>
+
+      <div>
+        <Label htmlFor="documents">Documents (optional)</Label>
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Input
+              id="documents"
+              type="file"
+              multiple
+              onChange={handleFileUpload}
+              disabled={uploading}
+              className="flex-1"
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+            />
+            {uploading && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <Upload className="h-4 w-4 animate-pulse" />
+                Uploading...
+              </div>
+            )}
+          </div>
+          
+          {uploadedDocuments.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">
+                {uploadedDocuments.length} document(s) uploaded
+              </p>
+              <div className="space-y-1">
+                {uploadedDocuments.map((doc, index) => (
+                  <div
+                    key={doc}
+                    className="flex items-center justify-between gap-2 p-2 rounded-md bg-muted/50"
+                  >
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <FileText className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
+                      <span className="text-sm truncate">
+                        {doc.split('/').pop()}
+                      </span>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleRemoveDocument(doc)}
+                      className="h-8 w-8 flex-shrink-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-2">
