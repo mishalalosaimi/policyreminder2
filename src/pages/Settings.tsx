@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SettingsForm } from "@/components/settings/SettingsForm";
@@ -7,6 +8,7 @@ import { Send } from "lucide-react";
 
 const Settings = () => {
   const queryClient = useQueryClient();
+  const [email, setEmail] = useState("");
 
   // Fetch user's company_id
   const { data: companyId } = useQuery({
@@ -38,20 +40,30 @@ const Settings = () => {
     },
   });
 
+  // Sync email state with settings
+  useEffect(() => {
+    if (settings?.notification_email) {
+      setEmail(settings.notification_email);
+    }
+  }, [settings]);
+
+  // Track unsaved changes
+  const hasUnsavedChanges = email !== settings?.notification_email && email !== "";
+
   const updateMutation = useMutation({
-    mutationFn: async (email: string) => {
+    mutationFn: async (emailToSave: string) => {
       if (!companyId) throw new Error("Company ID not found");
 
       if (settings?.id) {
         const { error } = await supabase
           .from("settings")
-          .update({ notification_email: email, company_id: companyId })
+          .update({ notification_email: emailToSave, company_id: companyId })
           .eq("id", settings.id);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("settings")
-          .insert({ notification_email: email, company_id: companyId });
+          .insert({ notification_email: emailToSave, company_id: companyId });
         if (error) throw error;
       }
     },
@@ -74,10 +86,11 @@ const Settings = () => {
       if (error) throw error;
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const recipientEmail = data?.recipientEmail || email;
       toast({ 
         title: "Test email sent successfully",
-        description: "Check the notification email inbox for the reminder."
+        description: `Sent to: ${recipientEmail}`
       });
     },
     onError: (error: Error) => {
@@ -89,6 +102,26 @@ const Settings = () => {
     },
   });
 
+  const handleSendTestEmail = async () => {
+    if (hasUnsavedChanges) {
+      // Auto-save first, then send test email
+      toast({ 
+        title: "Saving settings first...",
+        description: "Your changes will be saved before sending the test email."
+      });
+      
+      updateMutation.mutate(email, {
+        onSuccess: () => {
+          // After successful save, send test email
+          sendTestEmailMutation.mutate();
+        },
+      });
+    } else {
+      // No unsaved changes, send test email directly
+      sendTestEmailMutation.mutate();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto py-8 px-4 max-w-2xl">
@@ -97,9 +130,11 @@ const Settings = () => {
         <div className="space-y-6">
           <div className="bg-card p-6 rounded-lg border shadow-sm">
             <SettingsForm
-              settings={settings}
+              email={email}
+              setEmail={setEmail}
+              hasUnsavedChanges={hasUnsavedChanges}
               isLoading={isLoading}
-              onSave={(email) => updateMutation.mutate(email)}
+              onSave={(emailToSave) => updateMutation.mutate(emailToSave)}
             />
           </div>
 
@@ -111,12 +146,12 @@ const Settings = () => {
               Send a test reminder email to check if your notification settings are working correctly.
             </p>
             <Button
-              onClick={() => sendTestEmailMutation.mutate()}
-              disabled={sendTestEmailMutation.isPending || !settings?.notification_email}
+              onClick={handleSendTestEmail}
+              disabled={sendTestEmailMutation.isPending || updateMutation.isPending || !email}
               className="w-full sm:w-auto"
             >
               <Send className="mr-2 h-4 w-4" />
-              {sendTestEmailMutation.isPending ? "Sending..." : "Send Test Email"}
+              {sendTestEmailMutation.isPending || updateMutation.isPending ? "Sending..." : "Send Test Email"}
             </Button>
           </div>
         </div>
