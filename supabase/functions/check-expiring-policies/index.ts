@@ -56,10 +56,11 @@ Deno.serve(async (req) => {
 
     if (isTestMode) {
       console.log('Test mode enabled - fetching sample policies for demo email');
-      // In test mode, fetch policies from the user's company
+      // In test mode, fetch policies from the user's company sorted by soonest expiration
       let sampleQuery = supabase
         .from('policies')
         .select('*')
+        .order('end_date', { ascending: true })
         .limit(3);
       
       if (companyId) {
