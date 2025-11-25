@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
 
     // Get Resend configuration
     const resendApiKey = Deno.env.get('RESEND_API_KEY');
-    const fromEmail = Deno.env.get('FROM_EMAIL');
+    const fromEmail = Deno.env.get('From_Email');
 
     if (!resendApiKey || !fromEmail) {
       console.warn('⚠️ Resend not configured. Email would be sent but configuration is missing.');
