@@ -1,4 +1,5 @@
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { toast } from "@/hooks/use-toast";
 import type { Tables, TablesInsert } from "@/integrations/supabase/types";
 import { useState } from "react";
 import { FileText, X, Upload } from "lucide-react";
+import { policySchema, type PolicyFormData } from "@/lib/validations/policy";
 
 type Policy = Tables<"policies">;
 type PolicyInsert = TablesInsert<"policies">;
@@ -42,12 +44,26 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
     },
   });
 
-  const { register, handleSubmit, setValue, watch, reset } = useForm<PolicyInsert>({
-    defaultValues: editingPolicy || {
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<PolicyFormData>({
+    resolver: zodResolver(policySchema),
+    defaultValues: editingPolicy ? {
+      client_name: editingPolicy.client_name,
+      client_status: editingPolicy.client_status as "existing" | "prospect",
+      line: editingPolicy.line as "Medical" | "Motor" | "General",
+      line_detail: editingPolicy.line_detail || null,
+      end_date: editingPolicy.end_date,
+      count: editingPolicy.count,
+      insurer_name: editingPolicy.insurer_name,
+      channel_type: editingPolicy.channel_type as "direct" | "broker",
+      contact_name: editingPolicy.contact_name,
+      contact_email: editingPolicy.contact_email,
+      contact_phone: editingPolicy.contact_phone,
+      notes: editingPolicy.notes || null,
+    } : {
       client_name: "",
       client_status: "existing",
       line: "Medical",
-      line_detail: "",
+      line_detail: null,
       end_date: "",
       count: null,
       insurer_name: "",
@@ -55,7 +71,7 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
       contact_name: "",
       contact_email: "",
       contact_phone: "",
-      notes: "",
+      notes: null,
     },
   });
 
@@ -115,14 +131,25 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
   };
 
   const mutation = useMutation({
-    mutationFn: async (data: PolicyInsert) => {
+    mutationFn: async (data: PolicyFormData) => {
       if (!companyId) throw new Error("Company ID not found");
 
       const policyData = { 
-        ...data, 
+        client_name: data.client_name,
+        client_status: data.client_status,
+        line: data.line,
+        line_detail: data.line_detail || null,
+        end_date: data.end_date,
+        count: data.count ?? null,
+        insurer_name: data.insurer_name,
+        channel_type: data.channel_type,
+        contact_name: data.contact_name,
+        contact_email: data.contact_email,
+        contact_phone: data.contact_phone,
+        notes: data.notes || null,
         company_id: companyId,
         documents: uploadedDocuments.length > 0 ? uploadedDocuments : null
-      };
+      } as TablesInsert<"policies">;
 
       if (editingPolicy) {
         const { error } = await supabase
@@ -142,8 +169,12 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
       setUploadedDocuments([]);
       onSuccess();
     },
-    onError: () => {
-      toast({ title: "Error saving policy", variant: "destructive" });
+    onError: (error: any) => {
+      toast({ 
+        title: "Error saving policy", 
+        description: error.message || "Please check your input and try again",
+        variant: "destructive" 
+      });
     },
   });
 
@@ -152,14 +183,17 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="client_name">Client Name</Label>
-          <Input id="client_name" {...register("client_name", { required: true })} />
+          <Input id="client_name" {...register("client_name")} />
+          {errors.client_name && (
+            <p className="text-sm text-destructive mt-1">{errors.client_name.message}</p>
+          )}
         </div>
 
         <div>
           <Label htmlFor="client_status">Client Status</Label>
           <Select
             value={watch("client_status")}
-            onValueChange={(value) => setValue("client_status", value)}
+            onValueChange={(value) => setValue("client_status", value as "existing" | "prospect")}
           >
             <SelectTrigger>
               <SelectValue />
@@ -175,7 +209,7 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
           <Label htmlFor="line">Line</Label>
           <Select
             value={watch("line")}
-            onValueChange={(value) => setValue("line", value)}
+            onValueChange={(value) => setValue("line", value as "Medical" | "Motor" | "General")}
           >
             <SelectTrigger>
               <SelectValue />
@@ -191,11 +225,17 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
         <div>
           <Label htmlFor="line_detail">Line Detail (optional)</Label>
           <Input id="line_detail" {...register("line_detail")} />
+          {errors.line_detail && (
+            <p className="text-sm text-destructive mt-1">{errors.line_detail.message}</p>
+          )}
         </div>
 
         <div>
           <Label htmlFor="end_date">End Date</Label>
-          <Input id="end_date" type="date" {...register("end_date", { required: true })} />
+          <Input id="end_date" type="date" {...register("end_date")} />
+          {errors.end_date && (
+            <p className="text-sm text-destructive mt-1">{errors.end_date.message}</p>
+          )}
         </div>
 
         <div>
@@ -205,18 +245,24 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
             type="number"
             {...register("count", { valueAsNumber: true })}
           />
+          {errors.count && (
+            <p className="text-sm text-destructive mt-1">{errors.count.message}</p>
+          )}
         </div>
 
         <div>
           <Label htmlFor="insurer_name">Insurer Name</Label>
-          <Input id="insurer_name" {...register("insurer_name", { required: true })} />
+          <Input id="insurer_name" {...register("insurer_name")} />
+          {errors.insurer_name && (
+            <p className="text-sm text-destructive mt-1">{errors.insurer_name.message}</p>
+          )}
         </div>
 
         <div>
           <Label htmlFor="channel_type">Channel</Label>
           <Select
             value={watch("channel_type")}
-            onValueChange={(value) => setValue("channel_type", value)}
+            onValueChange={(value) => setValue("channel_type", value as "direct" | "broker")}
           >
             <SelectTrigger>
               <SelectValue />
@@ -230,23 +276,35 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
 
         <div>
           <Label htmlFor="contact_name">Contact Name</Label>
-          <Input id="contact_name" {...register("contact_name", { required: true })} />
+          <Input id="contact_name" {...register("contact_name")} />
+          {errors.contact_name && (
+            <p className="text-sm text-destructive mt-1">{errors.contact_name.message}</p>
+          )}
         </div>
 
         <div>
           <Label htmlFor="contact_email">Contact Email</Label>
-          <Input id="contact_email" type="email" {...register("contact_email", { required: true })} />
+          <Input id="contact_email" type="email" {...register("contact_email")} />
+          {errors.contact_email && (
+            <p className="text-sm text-destructive mt-1">{errors.contact_email.message}</p>
+          )}
         </div>
 
         <div>
           <Label htmlFor="contact_phone">Contact Phone</Label>
-          <Input id="contact_phone" {...register("contact_phone", { required: true })} />
+          <Input id="contact_phone" {...register("contact_phone")} />
+          {errors.contact_phone && (
+            <p className="text-sm text-destructive mt-1">{errors.contact_phone.message}</p>
+          )}
         </div>
       </div>
 
       <div>
         <Label htmlFor="notes">Notes (optional)</Label>
         <Textarea id="notes" {...register("notes")} />
+        {errors.notes && (
+          <p className="text-sm text-destructive mt-1">{errors.notes.message}</p>
+        )}
       </div>
 
       <div>
