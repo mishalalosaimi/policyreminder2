@@ -1,5 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.83.0';
-import { Resend } from 'https://esm.sh/resend@4.0.0';
+import sgMail from 'https://esm.sh/@sendgrid/mail@7.7.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -144,39 +144,36 @@ Deno.serve(async (req) => {
     // Generate email body
     const emailBody = generateEmailBody(policies as Policy[]);
 
-    // Get Resend configuration
-    const resendApiKey = Deno.env.get('RESEND_API_KEY');
+    // Get SendGrid configuration
+    const sendgridApiKey = Deno.env.get('SENDGRID_API_KEY');
     const fromEmail = Deno.env.get('From_Email');
 
-    if (!resendApiKey || !fromEmail) {
-      console.warn('⚠️ Resend not configured. Email would be sent but configuration is missing.');
+    if (!sendgridApiKey || !fromEmail) {
+      console.warn('⚠️ SendGrid not configured. Email would be sent but configuration is missing.');
 
       return new Response(
         JSON.stringify({ 
-          message: 'Email logged to console (Resend not configured)', 
+          message: 'Email logged to console (SendGrid not configured)', 
           policiesCount: policies.length 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     }
 
-    // Send email via Resend
+    // Send email via SendGrid
     try {
-      const resend = new Resend(resendApiKey);
+      sgMail.setApiKey(sendgridApiKey);
       
-      const { data, error } = await resend.emails.send({
-        from: fromEmail,
+      const msg = {
         to: settings.notification_email,
+        from: fromEmail,
         subject: 'Policies Expiring in 30 Days',
         html: emailBody,
-      });
+      };
 
-      if (error) {
-        console.error('Resend API error:', error);
-        throw new Error(`Resend API error: ${error.message}`);
-      }
+      await sgMail.send(msg);
 
-      console.log('✅ Email sent successfully via Resend:', data);
+      console.log('✅ Email sent successfully via SendGrid');
 
       return new Response(
         JSON.stringify({ 
@@ -187,7 +184,7 @@ Deno.serve(async (req) => {
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
       );
     } catch (emailError) {
-      console.error('Error sending email via Resend:', emailError);
+      console.error('Error sending email via SendGrid:', emailError);
       throw new Error(`Failed to send email: ${emailError instanceof Error ? emailError.message : 'Unknown error'}`);
     }
 
