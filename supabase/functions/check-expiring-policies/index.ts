@@ -1,5 +1,31 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.83.0';
-import sgMail from 'https://esm.sh/@sendgrid/mail@7.7.0';
+
+// SendGrid helper function using fetch (more compatible with Deno)
+async function sendGridSend(apiKey: string, msg: { to: string; from: string; subject: string; text?: string; html?: string }) {
+  const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      personalizations: [{ to: [{ email: msg.to }] }],
+      from: { email: msg.from },
+      subject: msg.subject,
+      content: [
+        ...(msg.text ? [{ type: 'text/plain', value: msg.text }] : []),
+        ...(msg.html ? [{ type: 'text/html', value: msg.html }] : []),
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`SendGrid API error: ${response.status} - ${errorBody}`);
+  }
+
+  return response;
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,19 +57,59 @@ Deno.serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Check if this is a test mode request
-    let isTestMode = false;
-    let companyId: string | null = null;
+    // Parse request body
+    let body: { type?: string; email?: string; testMode?: boolean; companyId?: string | null } = {};
     try {
-      const body = await req.json();
-      isTestMode = body.testMode === true;
-      companyId = body.companyId || null;
+      body = await req.json();
       console.log('Request body received:', JSON.stringify(body));
-      console.log('Test mode:', isTestMode);
-      console.log('Company ID:', companyId);
     } catch (e) {
       console.log('No request body or invalid JSON, proceeding in normal mode');
     }
+
+    // Handle simple test mode: { "type": "test", "email": "..." }
+    if (body.type === 'test' && body.email) {
+      console.log('Simple test mode - sending test email to:', body.email);
+      
+      const sendgridApiKey = Deno.env.get('SENDGRID_API_KEY');
+      const fromEmail = Deno.env.get('From_Email');
+
+      if (!sendgridApiKey || !fromEmail) {
+        console.error('SendGrid not configured');
+        return new Response(
+          JSON.stringify({ success: false, error: 'SendGrid not configured. Please set SENDGRID_API_KEY and From_Email secrets.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+
+      try {
+        await sendGridSend(sendgridApiKey, {
+          to: body.email,
+          from: fromEmail,
+          subject: 'PolicyMinders test email',
+          text: 'This is a test from PolicyMinders via SendGrid.',
+          html: '<p>This is a test from PolicyMinders via SendGrid.</p>',
+        });
+
+        console.log('✅ Test email sent successfully to:', body.email);
+        return new Response(
+          JSON.stringify({ success: true }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      } catch (emailError) {
+        console.error('Error sending test email:', emailError);
+        const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
+        return new Response(
+          JSON.stringify({ success: false, error: errorMessage }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+    }
+
+    // Legacy test mode for policy reminder preview
+    const isTestMode = body.testMode === true;
+    const companyId = body.companyId || null;
+    console.log('Test mode:', isTestMode);
+    console.log('Company ID:', companyId);
 
     // Calculate target date (30 days from now)
     const today = new Date();
@@ -162,16 +228,12 @@ Deno.serve(async (req) => {
 
     // Send email via SendGrid
     try {
-      sgMail.setApiKey(sendgridApiKey);
-      
-      const msg = {
+      await sendGridSend(sendgridApiKey, {
         to: settings.notification_email,
         from: fromEmail,
         subject: 'Policies Expiring in 30 Days',
         html: emailBody,
-      };
-
-      await sgMail.send(msg);
+      });
 
       console.log('✅ Email sent successfully via SendGrid');
 

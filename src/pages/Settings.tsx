@@ -77,20 +77,25 @@ const Settings = () => {
   });
 
   const sendTestEmailMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (testEmail: string) => {
       const { data, error } = await supabase.functions.invoke(
         "check-expiring-policies",
-        { body: { testMode: true, companyId } }
+        { body: { type: "test", email: testEmail } }
       );
       
       if (error) throw error;
+      
+      // Check for success/error in response
+      if (data && data.success === false) {
+        throw new Error(data.error || "Failed to send test email");
+      }
+      
       return data;
     },
-    onSuccess: (data) => {
-      const recipientEmail = data?.recipientEmail || email;
+    onSuccess: () => {
       toast({ 
         title: "Test email sent successfully",
-        description: `Sent to: ${recipientEmail}`
+        description: `Sent to: ${email}`
       });
     },
     onError: (error: Error) => {
@@ -112,13 +117,13 @@ const Settings = () => {
       
       updateMutation.mutate(email, {
         onSuccess: () => {
-          // After successful save, send test email
-          sendTestEmailMutation.mutate();
+          // After successful save, send test email with the saved email
+          sendTestEmailMutation.mutate(email);
         },
       });
     } else {
       // No unsaved changes, send test email directly
-      sendTestEmailMutation.mutate();
+      sendTestEmailMutation.mutate(email);
     }
   };
 
