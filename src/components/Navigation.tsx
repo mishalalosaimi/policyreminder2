@@ -1,22 +1,29 @@
 import { Link, useLocation } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { FileText, Settings } from "lucide-react";
+import { FileText, Settings, Users } from "lucide-react";
 import { UserMenu } from "./UserMenu";
+import { useUserRole } from "@/hooks/useUserRole";
 
 export const Navigation = () => {
   const location = useLocation();
+  const { data: userRole } = useUserRole();
 
   const links = [
-    { to: "/", label: "Dashboard", icon: FileText },
-    { to: "/settings", label: "Settings", icon: Settings },
+    { to: "/", label: "Dashboard", icon: FileText, showAlways: true },
+    { to: "/team", label: "Team", icon: Users, adminOnly: true },
+    { to: "/settings", label: "Settings", icon: Settings, showAlways: true },
   ];
+
+  const visibleLinks = links.filter(link => 
+    link.showAlways || (link.adminOnly && userRole?.isAdmin)
+  );
 
   return (
     <nav className="border-b bg-card">
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-14">
           <div className="flex gap-6">
-            {links.map(({ to, label, icon: Icon }) => (
+            {visibleLinks.map(({ to, label, icon: Icon }) => (
               <Link
                 key={to}
                 to={to}
