@@ -64,6 +64,14 @@ const AcceptInvitation = () => {
         }
 
         if (response.data?.error) {
+          // If session is stale/invalid, treat as auth-required
+          if (response.data.error === "Not authenticated") {
+            // Sign out to clear stale session
+            await supabase.auth.signOut();
+            setStatus("auth-required");
+            setMessage("Please sign in or create an account to accept this invitation.");
+            return;
+          }
           throw new Error(response.data.error);
         }
 
@@ -80,6 +88,13 @@ const AcceptInvitation = () => {
           navigate("/");
         }, 3000);
       } catch (error: any) {
+        // Handle stale session errors
+        if (error.message === "Not authenticated") {
+          await supabase.auth.signOut();
+          setStatus("auth-required");
+          setMessage("Please sign in or create an account to accept this invitation.");
+          return;
+        }
         setStatus("error");
         setMessage(error.message || "Failed to accept invitation");
       }
