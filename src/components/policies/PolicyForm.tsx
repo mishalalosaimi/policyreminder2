@@ -59,6 +59,7 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
       contact_email: editingPolicy.contact_email,
       contact_phone: editingPolicy.contact_phone,
       notes: editingPolicy.notes || null,
+      reminder_lead_days: editingPolicy.reminder_lead_days || 30,
     } : {
       client_name: "",
       client_status: "existing",
@@ -72,6 +73,7 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
       contact_email: "",
       contact_phone: "",
       notes: null,
+      reminder_lead_days: 30,
     },
   });
 
@@ -148,7 +150,8 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
         contact_phone: data.contact_phone,
         notes: data.notes || null,
         company_id: companyId,
-        documents: uploadedDocuments.length > 0 ? uploadedDocuments : null
+        documents: uploadedDocuments.length > 0 ? uploadedDocuments : null,
+        reminder_lead_days: data.reminder_lead_days,
       } as TablesInsert<"policies">;
 
       if (editingPolicy) {
@@ -296,6 +299,23 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
           {errors.contact_phone && (
             <p className="text-sm text-destructive mt-1">{errors.contact_phone.message}</p>
           )}
+        </div>
+
+        <div>
+          <Label htmlFor="reminder_lead_days">Reminder Timing</Label>
+          <Select
+            value={String(watch("reminder_lead_days") || 30)}
+            onValueChange={(value) => setValue("reminder_lead_days", parseInt(value, 10))}
+          >
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="45">45 days before</SelectItem>
+              <SelectItem value="30">30 days before</SelectItem>
+              <SelectItem value="14">14 days before</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

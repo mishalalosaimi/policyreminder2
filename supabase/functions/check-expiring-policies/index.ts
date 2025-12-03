@@ -45,6 +45,8 @@ interface Policy {
   contact_name: string;
   contact_email: string;
   contact_phone: string;
+  reminder_lead_days: number;
+  reminder_sent_at: string | null;
 }
 
 Deno.serve(async (req) => {
@@ -103,7 +105,9 @@ Deno.serve(async (req) => {
               channel_type: 'direct',
               contact_name: 'John Doe',
               contact_email: 'john.doe@example.com',
-              contact_phone: '+966 50 123 4567'
+              contact_phone: '+966 50 123 4567',
+              reminder_lead_days: 30,
+              reminder_sent_at: null
             }];
 
         const testHtml = generateEmailBody(testPolicies, true);
@@ -180,24 +184,46 @@ Deno.serve(async (req) => {
           channel_type: 'broker',
           contact_name: 'John Doe',
           contact_email: 'john.doe@example.com',
-          contact_phone: '+966 50 123 4567'
+          contact_phone: '+966 50 123 4567',
+          reminder_lead_days: 30,
+          reminder_sent_at: null
         }];
         console.log('No policies in database - using mock policy for test email');
       }
     } else {
-      // Normal mode - query policies expiring in 30 days
-      const { data: expiringPolicies, error: policiesError } = await supabase
+    // Normal mode - query all policies and filter by their individual reminder_lead_days
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayString = today.toISOString().split('T')[0];
+
+      // Fetch all policies that haven't been reminded today
+      const { data: allPolicies, error: policiesError } = await supabase
         .from('policies')
-        .select('*')
-        .eq('end_date', targetDateString);
+        .select('*');
 
       if (policiesError) {
         console.error('Error fetching policies:', policiesError);
         throw policiesError;
       }
 
-      policies = (expiringPolicies || []) as Policy[];
-      console.log(`Found ${policies.length} policies expiring in 30 days`);
+      // Filter policies where days until expiry matches their reminder_lead_days
+      // and reminder hasn't been sent today
+      policies = ((allPolicies || []) as Policy[]).filter((policy) => {
+        const daysUntilExpiry = calculateDaysUntilExpiry(policy.end_date);
+        const reminderLeadDays = policy.reminder_lead_days || 30;
+        
+        // Check if already reminded today
+        if (policy.reminder_sent_at) {
+          const sentDate = policy.reminder_sent_at.split('T')[0];
+          if (sentDate === todayString) {
+            return false;
+          }
+        }
+        
+        return daysUntilExpiry === reminderLeadDays;
+      });
+
+      console.log(`Found ${policies.length} policies matching their reminder timing`);
 
       if (policies.length === 0) {
         return new Response(
@@ -266,6 +292,21 @@ Deno.serve(async (req) => {
       });
 
       console.log('✅ Email sent successfully via SendGrid');
+
+      // Update reminder_sent_at for all policies that were included in the email
+      if (!isTestMode && policies.length > 0) {
+        const policyIds = policies.map(p => p.id);
+        const { error: updateError } = await supabase
+          .from('policies')
+          .update({ reminder_sent_at: new Date().toISOString() })
+          .in('id', policyIds);
+
+        if (updateError) {
+          console.error('Error updating reminder_sent_at:', updateError);
+        } else {
+          console.log(`Updated reminder_sent_at for ${policyIds.length} policies`);
+        }
+      }
 
       return new Response(
         JSON.stringify({ 

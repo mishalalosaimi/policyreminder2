@@ -50,6 +50,8 @@ export type Database = {
           line: string
           line_detail: string | null
           notes: string | null
+          reminder_lead_days: number
+          reminder_sent_at: string | null
         }
         Insert: {
           channel_type: string
@@ -68,6 +70,8 @@ export type Database = {
           line: string
           line_detail?: string | null
           notes?: string | null
+          reminder_lead_days?: number
+          reminder_sent_at?: string | null
         }
         Update: {
           channel_type?: string
@@ -86,6 +90,8 @@ export type Database = {
           line?: string
           line_detail?: string | null
           notes?: string | null
+          reminder_lead_days?: number
+          reminder_sent_at?: string | null
         }
         Relationships: [
           {
