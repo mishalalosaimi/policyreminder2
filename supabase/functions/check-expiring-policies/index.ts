@@ -47,6 +47,7 @@ interface Policy {
   contact_phone: string;
   reminder_lead_days: number;
   reminder_sent_at: string | null;
+  company_id: string | null;
 }
 
 Deno.serve(async (req) => {
@@ -60,7 +61,7 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request body
-    let body: { type?: string; email?: string; testMode?: boolean; companyId?: string | null } = {};
+    let body: { type?: string; email?: string; testMode?: boolean; companyId?: string | null; policyId?: string } = {};
     try {
       body = await req.json();
       console.log('Request body received:', JSON.stringify(body));
@@ -107,7 +108,8 @@ Deno.serve(async (req) => {
               contact_email: 'john.doe@example.com',
               contact_phone: '+966 50 123 4567',
               reminder_lead_days: 30,
-              reminder_sent_at: null
+              reminder_sent_at: null,
+              company_id: null
             }];
 
         const testHtml = generateEmailBody(testPolicies, true);
@@ -126,6 +128,77 @@ Deno.serve(async (req) => {
         );
       } catch (emailError) {
         console.error('Error sending test email:', emailError);
+        const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
+        return new Response(
+          JSON.stringify({ success: false, error: errorMessage }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+    }
+
+    // Handle manual reminder for specific policy: { "type": "manual", "policyId": "..." }
+    if (body.type === 'manual' && body.policyId) {
+      console.log('Manual reminder mode - sending for policy:', body.policyId);
+      
+      const sendgridApiKey = Deno.env.get('SENDGRID_API_KEY');
+      const fromEmail = Deno.env.get('From_Email');
+
+      if (!sendgridApiKey || !fromEmail) {
+        console.error('SendGrid not configured');
+        return new Response(
+          JSON.stringify({ success: false, error: 'SendGrid not configured.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      }
+
+      try {
+        // Fetch the specific policy
+        const { data: policyData, error: policyError } = await supabase
+          .from('policies')
+          .select('*')
+          .eq('id', body.policyId)
+          .single();
+
+        if (policyError || !policyData) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Policy not found' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
+        }
+
+        const policy = policyData as Policy;
+
+        // Get notification email from settings
+        let settingsQuery = supabase.from('settings').select('notification_email');
+        if (policy.company_id) {
+          settingsQuery = settingsQuery.eq('company_id', policy.company_id);
+        }
+        const { data: settings } = await settingsQuery.limit(1).maybeSingle();
+
+        if (!settings?.notification_email) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Notification email not configured' }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+          );
+        }
+
+        const emailHtml = generateEmailBody([policy], false);
+        const policyType = policy.line_detail ? `${policy.line} – ${policy.line_detail}` : policy.line;
+        
+        await sendGridSend(sendgridApiKey, {
+          to: settings.notification_email,
+          from: { email: fromEmail, name: 'PolicyMinders Alerts' },
+          subject: `Policy Expiry Reminder – ${policy.client_name} – ${policyType}`,
+          html: emailHtml,
+        });
+
+        console.log('✅ Manual reminder sent for policy:', policy.client_name);
+        return new Response(
+          JSON.stringify({ success: true, recipientEmail: settings.notification_email }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+        );
+      } catch (emailError) {
+        console.error('Error sending manual reminder:', emailError);
         const errorMessage = emailError instanceof Error ? emailError.message : 'Unknown error';
         return new Response(
           JSON.stringify({ success: false, error: errorMessage }),
@@ -186,7 +259,8 @@ Deno.serve(async (req) => {
           contact_email: 'john.doe@example.com',
           contact_phone: '+966 50 123 4567',
           reminder_lead_days: 30,
-          reminder_sent_at: null
+          reminder_sent_at: null,
+          company_id: null
         }];
         console.log('No policies in database - using mock policy for test email');
       }
