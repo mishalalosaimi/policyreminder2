@@ -27,20 +27,29 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
   const [uploadedDocuments, setUploadedDocuments] = useState<string[]>(editingPolicy?.documents || []);
   const [uploading, setUploading] = useState(false);
   
-  // Fetch user's company_id
-  const { data: companyId } = useQuery({
-    queryKey: ["userCompanyId"],
+  // Fetch user's organization_id
+  const { data: organizationId } = useQuery({
+    queryKey: ["userOrganizationId"],
     queryFn: async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("company_id")
+      const { data: membership } = await supabase
+        .from("organization_members")
+        .select("organization_id")
         .eq("user_id", user.id)
         .single();
 
-      return profile?.company_id;
+      return membership?.organization_id;
+    },
+  });
+
+  // Get current user ID
+  const { data: currentUser } = useQuery({
+    queryKey: ["currentUser"],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      return user;
     },
   });
 
@@ -134,7 +143,7 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
 
   const mutation = useMutation({
     mutationFn: async (data: PolicyFormData) => {
-      if (!companyId) throw new Error("Company ID not found");
+      if (!organizationId) throw new Error("Organization ID not found");
 
       const policyData = { 
         client_name: data.client_name,
@@ -149,7 +158,9 @@ export const PolicyForm = ({ editingPolicy, onSuccess, onCancel }: PolicyFormPro
         contact_email: data.contact_email,
         contact_phone: data.contact_phone,
         notes: data.notes || null,
-        company_id: companyId,
+        company_id: organizationId,
+        organization_id: organizationId,
+        user_id: editingPolicy?.user_id || currentUser?.id,
         documents: uploadedDocuments.length > 0 ? uploadedDocuments : null,
         reminder_lead_days: data.reminder_lead_days,
       } as TablesInsert<"policies">;

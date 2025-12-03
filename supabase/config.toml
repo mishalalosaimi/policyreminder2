@@ -2,3 +2,9 @@ project_id = "xcacorjnlwiiupemmyag"
 
 [functions.check-expiring-policies]
 verify_jwt = false
+
+[functions.send-invitation]
+verify_jwt = true
+
+[functions.accept-invitation]
+verify_jwt = true
