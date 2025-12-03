@@ -8,6 +8,8 @@ import { AuthGuard } from "@/components/AuthGuard";
 import Dashboard from "./pages/Dashboard";
 import PolicyFormPage from "./pages/PolicyFormPage";
 import Settings from "./pages/Settings";
+import TeamManagement from "./pages/TeamManagement";
+import AcceptInvitation from "./pages/AcceptInvitation";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -21,6 +23,7 @@ const App = () => (
       <BrowserRouter>
         <Routes>
           <Route path="/auth" element={<Auth />} />
+          <Route path="/accept-invitation" element={<AcceptInvitation />} />
           <Route
             path="/*"
             element={
@@ -31,6 +34,7 @@ const App = () => (
                   <Route path="/policy/new" element={<PolicyFormPage />} />
                   <Route path="/policy/:id" element={<PolicyFormPage />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/team" element={<TeamManagement />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </AuthGuard>
