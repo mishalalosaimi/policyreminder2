@@ -82,12 +82,13 @@ Deno.serve(async (req) => {
       }
 
       try {
+        const testHtml = generateTestEmailBody();
+        
         await sendGridSend(sendgridApiKey, {
           to: body.email,
           from: { email: fromEmail, name: 'PolicyMinders Alerts' },
-          subject: 'PolicyMinders test email',
-          text: 'This is a test from PolicyMinders via SendGrid.',
-          html: '<p>This is a test from PolicyMinders via SendGrid.</p>',
+          subject: 'PolicyMinders – Test Email',
+          html: testHtml,
         });
 
         console.log('✅ Test email sent successfully to:', body.email);
@@ -265,6 +266,68 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+function generateTestEmailBody(): string {
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PolicyMinders Test Email</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f1f5f9; padding: 40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width: 600px; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); padding: 32px 40px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">PolicyMinders</h1>
+              <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.95); font-size: 15px; font-weight: 500;">Test Email</p>
+            </td>
+          </tr>
+          
+          <!-- Body -->
+          <tr>
+            <td style="padding: 40px;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background: #f0fdf4; border-radius: 8px; border-left: 4px solid #22c55e;">
+                <tr>
+                  <td style="padding: 24px;">
+                    <p style="margin: 0; font-size: 16px; color: #166534; font-weight: 600;">
+                      ✅ Email Configuration Successful
+                    </p>
+                    <p style="margin: 12px 0 0 0; font-size: 14px; color: #15803d; line-height: 1.6;">
+                      Your SendGrid email integration is working correctly. You will receive policy expiry reminders at this email address.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+              
+              <p style="margin: 28px 0 0 0; font-size: 14px; color: #64748b; line-height: 1.6;">
+                This is a test email from PolicyMinders to verify your notification settings. No action is required.
+              </p>
+            </td>
+          </tr>
+          
+          <!-- Footer -->
+          <tr>
+            <td style="background: #f8fafc; padding: 28px 40px; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.6;">
+                This reminder was sent automatically by PolicyMinders.<br>
+                For support, contact your system admin.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+}
 
 function calculateDaysUntilExpiry(endDate: string): number {
   const today = new Date();
