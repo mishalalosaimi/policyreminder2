@@ -25,8 +25,9 @@ export const signupSchema = z.object({
   company_name: z
     .string()
     .trim()
-    .min(1, "Company name is required")
-    .max(200, "Company name must be less than 200 characters"),
+    .max(200, "Company name must be less than 200 characters")
+    .optional()
+    .or(z.literal("")),
   
   email: z
     .string()

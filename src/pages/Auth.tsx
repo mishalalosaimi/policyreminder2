@@ -16,6 +16,7 @@ const Auth = () => {
   const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(false);
+  const [hasPendingInvitation, setHasPendingInvitation] = useState(false);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -36,11 +37,15 @@ const Auth = () => {
   });
 
   useEffect(() => {
+    // Check for pending invitation
+    const pendingToken = sessionStorage.getItem("pendingInvitationToken");
+    setHasPendingInvitation(!!pendingToken);
+
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
-        navigate("/");
+        handleRedirectAfterAuth();
       }
     });
 
@@ -49,13 +54,23 @@ const Auth = () => {
       (_event, session) => {
         setSession(session);
         if (session) {
-          navigate("/");
+          handleRedirectAfterAuth();
         }
       }
     );
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  const handleRedirectAfterAuth = () => {
+    const pendingToken = sessionStorage.getItem("pendingInvitationToken");
+    if (pendingToken) {
+      sessionStorage.removeItem("pendingInvitationToken");
+      navigate(`/accept-invitation?token=${pendingToken}`);
+    } else {
+      navigate("/");
+    }
+  };
 
   const handleLogin = async (data: LoginFormData) => {
     setLoading(true);
@@ -108,7 +123,8 @@ const Auth = () => {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
             name: data.name,
-            company_name: data.company_name,
+            // Only pass company_name if not joining via invitation
+            ...(hasPendingInvitation ? {} : { company_name: data.company_name }),
           },
         },
       });
@@ -154,10 +170,14 @@ const Auth = () => {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Welcome</CardTitle>
-          <CardDescription>Login to your account or create a new one</CardDescription>
+          <CardDescription>
+            {hasPendingInvitation 
+              ? "Create an account to accept your invitation" 
+              : "Login to your account or create a new one"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="login" className="w-full">
+          <Tabs defaultValue={hasPendingInvitation ? "signup" : "login"} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
@@ -208,18 +228,20 @@ const Auth = () => {
                     <p className="text-sm text-destructive">{signupForm.formState.errors.name.message}</p>
                   )}
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="company-name">Company Name</Label>
-                  <Input
-                    id="company-name"
-                    type="text"
-                    placeholder="Your Company"
-                    {...signupForm.register("company_name")}
-                  />
-                  {signupForm.formState.errors.company_name && (
-                    <p className="text-sm text-destructive">{signupForm.formState.errors.company_name.message}</p>
-                  )}
-                </div>
+                {!hasPendingInvitation && (
+                  <div className="space-y-2">
+                    <Label htmlFor="company-name">Company Name</Label>
+                    <Input
+                      id="company-name"
+                      type="text"
+                      placeholder="Your Company"
+                      {...signupForm.register("company_name")}
+                    />
+                    {signupForm.formState.errors.company_name && (
+                      <p className="text-sm text-destructive">{signupForm.formState.errors.company_name.message}</p>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">Email</Label>
                   <Input

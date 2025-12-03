@@ -53,10 +53,46 @@ serve(async (req) => {
       .single();
 
     if (existingMember) {
-      throw new Error("You are already a member of an organization");
+      // Check if their current org has only them as a member (auto-created temp org)
+      const { count } = await supabaseAdmin
+        .from("organization_members")
+        .select("*", { count: "exact", head: true })
+        .eq("organization_id", existingMember.organization_id);
+
+      if (count === 1) {
+        console.log("[ACCEPT] Transferring user from temp org:", existingMember.organization_id);
+        
+        // Delete their membership from the old org
+        await supabaseAdmin
+          .from("organization_members")
+          .delete()
+          .eq("user_id", user.id);
+
+        // Delete the user_role entry
+        await supabaseAdmin
+          .from("user_roles")
+          .delete()
+          .eq("user_id", user.id);
+
+        // Delete the empty organization
+        await supabaseAdmin
+          .from("organizations")
+          .delete()
+          .eq("id", existingMember.organization_id);
+
+        // Also delete from legacy companies table
+        await supabaseAdmin
+          .from("companies")
+          .delete()
+          .eq("id", existingMember.organization_id);
+
+        console.log("[ACCEPT] Deleted temp org:", existingMember.organization_id);
+      } else {
+        throw new Error("You are already a member of an organization with other users");
+      }
     }
 
-    // Add user to organization
+    // Add user to new organization
     const { error: memberError } = await supabaseAdmin
       .from("organization_members")
       .insert({
@@ -75,14 +111,21 @@ serve(async (req) => {
         role: invitation.role,
       });
 
-    // Create profile if it doesn't exist
+    // Update or create profile to point to the new organization
     const { data: existingProfile } = await supabaseAdmin
       .from("profiles")
       .select("id")
       .eq("user_id", user.id)
       .single();
 
-    if (!existingProfile) {
+    if (existingProfile) {
+      // Update existing profile
+      await supabaseAdmin
+        .from("profiles")
+        .update({ company_id: invitation.organization_id })
+        .eq("user_id", user.id);
+    } else {
+      // Create new profile
       await supabaseAdmin
         .from("profiles")
         .insert({
