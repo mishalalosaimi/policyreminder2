@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useOrganization } from "@/hooks/useOrganization";
-import { useTeamMembers, useInvitations, useSendInvitation, useRemoveMember, useUpdateMemberRole } from "@/hooks/useTeamMembers";
+import { useTeamMembers, useInvitations, useSendInvitation, useRemoveMember, useUpdateMemberRole, useDeleteInvitation } from "@/hooks/useTeamMembers";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ const TeamManagement = () => {
   const sendInvitation = useSendInvitation();
   const removeMember = useRemoveMember();
   const updateRole = useUpdateMemberRole();
+  const deleteInvitation = useDeleteInvitation();
 
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"admin" | "broker">("broker");
@@ -56,6 +57,12 @@ const TeamManagement = () => {
   const handleRemoveMember = async (memberId: string, memberName: string) => {
     if (confirm(`Are you sure you want to remove ${memberName} from the team?`)) {
       await removeMember.mutateAsync(memberId);
+    }
+  };
+
+  const handleDeleteInvitation = async (invitationId: string, email: string) => {
+    if (confirm(`Are you sure you want to delete the invitation for ${email}?`)) {
+      await deleteInvitation.mutateAsync(invitationId);
     }
   };
 
@@ -241,6 +248,7 @@ const TeamManagement = () => {
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Expires</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -252,6 +260,15 @@ const TeamManagement = () => {
                       </TableCell>
                       <TableCell>
                         {new Date(invite.expires_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDeleteInvitation(invite.id, invite.email)}
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
                       </TableCell>
                     </TableRow>
                   ))}

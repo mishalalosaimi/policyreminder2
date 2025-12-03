@@ -153,3 +153,29 @@ export const useUpdateMemberRole = () => {
     },
   });
 };
+
+export const useDeleteInvitation = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (invitationId: string) => {
+      const { error } = await supabase
+        .from("invitations")
+        .delete()
+        .eq("id", invitationId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["invitations"] });
+      toast({ title: "Invitation deleted" });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to delete invitation",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+};

@@ -14,12 +14,33 @@ const AcceptInvitation = () => {
   const [status, setStatus] = useState<"loading" | "success" | "error" | "auth-required">("loading");
   const [message, setMessage] = useState("");
   const [organizationName, setOrganizationName] = useState("");
+  const [invitationEmail, setInvitationEmail] = useState("");
 
   useEffect(() => {
-    const acceptInvitation = async () => {
+    const processInvitation = async () => {
       if (!token) {
         setStatus("error");
         setMessage("Invalid invitation link. No token provided.");
+        return;
+      }
+
+      // First, fetch invitation info (public endpoint)
+      try {
+        const infoResponse = await supabase.functions.invoke("get-invitation-info", {
+          body: { token },
+        });
+
+        if (infoResponse.error || infoResponse.data?.error) {
+          setStatus("error");
+          setMessage(infoResponse.data?.error || infoResponse.error?.message || "Invalid invitation");
+          return;
+        }
+
+        setInvitationEmail(infoResponse.data.email);
+        setOrganizationName(infoResponse.data.organizationName);
+      } catch (error: any) {
+        setStatus("error");
+        setMessage("Failed to fetch invitation details");
         return;
       }
 
@@ -32,6 +53,7 @@ const AcceptInvitation = () => {
         return;
       }
 
+      // User is authenticated - try to accept the invitation
       try {
         const response = await supabase.functions.invoke("accept-invitation", {
           body: { invitationToken: token },
@@ -46,7 +68,6 @@ const AcceptInvitation = () => {
         }
 
         setStatus("success");
-        setOrganizationName(response.data.organizationName || "the organization");
         setMessage(`You've successfully joined as a ${response.data.role}!`);
         
         toast({
@@ -64,12 +85,14 @@ const AcceptInvitation = () => {
       }
     };
 
-    acceptInvitation();
+    processInvitation();
   }, [token, navigate]);
 
-  const handleSignIn = () => {
-    // Store the invitation token to use after auth
+  const handleSignIn = async () => {
+    // Store both the token AND the email for pre-filling
     sessionStorage.setItem("pendingInvitationToken", token || "");
+    sessionStorage.setItem("pendingInvitationEmail", invitationEmail);
+    sessionStorage.setItem("pendingOrganizationName", organizationName);
     navigate("/auth");
   };
 
@@ -82,7 +105,7 @@ const AcceptInvitation = () => {
             {status === "loading" && "Processing your invitation..."}
             {status === "success" && `Welcome to ${organizationName}!`}
             {status === "error" && "Invitation Error"}
-            {status === "auth-required" && "Authentication Required"}
+            {status === "auth-required" && `Join ${organizationName || "the team"}`}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col items-center gap-4">
@@ -111,6 +134,11 @@ const AcceptInvitation = () => {
           {status === "auth-required" && (
             <>
               <p className="text-center text-muted-foreground">{message}</p>
+              {invitationEmail && (
+                <p className="text-sm text-muted-foreground">
+                  Invitation for: <strong>{invitationEmail}</strong>
+                </p>
+              )}
               <Button onClick={handleSignIn}>
                 Sign In / Create Account
               </Button>
