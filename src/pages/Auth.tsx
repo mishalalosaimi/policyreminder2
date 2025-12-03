@@ -19,6 +19,7 @@ const Auth = () => {
   const [hasPendingInvitation, setHasPendingInvitation] = useState(false);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const [pendingOrgName, setPendingOrgName] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("login");
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -47,6 +48,11 @@ const Auth = () => {
     setHasPendingInvitation(!!pendingToken);
     setPendingEmail(invitationEmail);
     setPendingOrgName(orgName);
+
+    // Default to signup tab if there's a pending invitation
+    if (pendingToken) {
+      setActiveTab("signup");
+    }
 
     // Pre-fill email if from invitation
     if (invitationEmail) {
@@ -193,7 +199,7 @@ const Auth = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue={hasPendingInvitation ? "signup" : "login"} className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="signup">Sign Up</TabsTrigger>
