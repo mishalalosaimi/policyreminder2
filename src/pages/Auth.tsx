@@ -17,6 +17,8 @@ const Auth = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasPendingInvitation, setHasPendingInvitation] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [pendingOrgName, setPendingOrgName] = useState<string | null>(null);
 
   const loginForm = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
@@ -39,7 +41,18 @@ const Auth = () => {
   useEffect(() => {
     // Check for pending invitation
     const pendingToken = sessionStorage.getItem("pendingInvitationToken");
+    const invitationEmail = sessionStorage.getItem("pendingInvitationEmail");
+    const orgName = sessionStorage.getItem("pendingOrganizationName");
+    
     setHasPendingInvitation(!!pendingToken);
+    setPendingEmail(invitationEmail);
+    setPendingOrgName(orgName);
+
+    // Pre-fill email if from invitation
+    if (invitationEmail) {
+      signupForm.setValue("email", invitationEmail);
+      loginForm.setValue("email", invitationEmail);
+    }
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -65,7 +78,10 @@ const Auth = () => {
   const handleRedirectAfterAuth = () => {
     const pendingToken = sessionStorage.getItem("pendingInvitationToken");
     if (pendingToken) {
+      // Clear all invitation-related session storage
       sessionStorage.removeItem("pendingInvitationToken");
+      sessionStorage.removeItem("pendingInvitationEmail");
+      sessionStorage.removeItem("pendingOrganizationName");
       navigate(`/accept-invitation?token=${pendingToken}`);
     } else {
       navigate("/");
@@ -172,7 +188,7 @@ const Auth = () => {
           <CardTitle>Welcome</CardTitle>
           <CardDescription>
             {hasPendingInvitation 
-              ? "Create an account to accept your invitation" 
+              ? `Create an account to join ${pendingOrgName || "the team"}` 
               : "Login to your account or create a new one"}
           </CardDescription>
         </CardHeader>
@@ -191,8 +207,14 @@ const Auth = () => {
                     id="login-email"
                     type="email"
                     placeholder="your@email.com"
+                    disabled={!!pendingEmail}
                     {...loginForm.register("email")}
                   />
+                  {pendingEmail && (
+                    <p className="text-xs text-muted-foreground">
+                      This email was specified in your invitation
+                    </p>
+                  )}
                   {loginForm.formState.errors.email && (
                     <p className="text-sm text-destructive">{loginForm.formState.errors.email.message}</p>
                   )}
@@ -248,8 +270,14 @@ const Auth = () => {
                     id="signup-email"
                     type="email"
                     placeholder="your@email.com"
+                    disabled={!!pendingEmail}
                     {...signupForm.register("email")}
                   />
+                  {pendingEmail && (
+                    <p className="text-xs text-muted-foreground">
+                      This email was specified in your invitation
+                    </p>
+                  )}
                   {signupForm.formState.errors.email && (
                     <p className="text-sm text-destructive">{signupForm.formState.errors.email.message}</p>
                   )}
