@@ -231,8 +231,8 @@ Deno.serve(async (req) => {
       // Generate subject line with first policy details
       const firstPolicy = policies[0];
       const subject = policies.length === 1
-        ? `Upcoming Policy Renewal – ${firstPolicy.client_name} – ${firstPolicy.line}`
-        : `Upcoming Policy Renewals – ${policies.length} Policies Expiring Soon`;
+        ? `Policy Expiry Reminder – ${firstPolicy.client_name} – ${firstPolicy.line}`
+        : `Policy Expiry Reminder – ${policies.length} Policies Expiring Soon`;
 
       await sendGridSend(sendgridApiKey, {
         to: settings.notification_email,
@@ -291,43 +291,35 @@ function generateEmailBody(policies: Policy[]): string {
     const policyType = policy.line_detail ? `${policy.line} – ${policy.line_detail}` : policy.line;
     
     return `
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 20px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 24px;">
       <tr>
-        <td style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 20px;">
+        <td style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 24px;">
           <table width="100%" cellpadding="0" cellspacing="0">
             <tr>
-              <td style="padding-bottom: 12px; border-bottom: 1px solid #e2e8f0;">
-                <span style="font-size: 18px; font-weight: 600; color: #1e293b;">${policy.client_name}</span>
+              <td style="padding-bottom: 16px; border-bottom: 2px solid #3b82f6;">
+                <span style="font-size: 20px; font-weight: 700; color: #1e293b;">${policy.client_name}</span>
               </td>
             </tr>
             <tr>
-              <td style="padding-top: 16px;">
+              <td style="padding-top: 20px;">
                 <table width="100%" cellpadding="0" cellspacing="0">
                   <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-size: 14px; width: 140px;">Policy Type:</td>
-                    <td style="padding: 6px 0; color: #1e293b; font-size: 14px; font-weight: 500;">${policyType}</td>
+                    <td style="padding: 8px 0; color: #64748b; font-size: 14px; width: 140px; vertical-align: top;">Policy Number:</td>
+                    <td style="padding: 8px 0; color: #1e293b; font-size: 14px; font-weight: 600;">${policy.id.substring(0, 8).toUpperCase()}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-size: 14px;">Policy Number:</td>
-                    <td style="padding: 6px 0; color: #1e293b; font-size: 14px; font-weight: 500;">${policy.id.substring(0, 8).toUpperCase()}</td>
+                    <td style="padding: 8px 0; color: #64748b; font-size: 14px; vertical-align: top;">Policy Type:</td>
+                    <td style="padding: 8px 0; color: #1e293b; font-size: 14px; font-weight: 600;">${policyType}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-size: 14px;">Insurer:</td>
-                    <td style="padding: 6px 0; color: #1e293b; font-size: 14px; font-weight: 500;">${policy.insurer_name}</td>
+                    <td style="padding: 8px 0; color: #64748b; font-size: 14px; vertical-align: top;">Expiry Date:</td>
+                    <td style="padding: 8px 0; color: #1e293b; font-size: 14px; font-weight: 600;">${formatDate(policy.end_date)}</td>
                   </tr>
                   <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-size: 14px;">Expiry Date:</td>
-                    <td style="padding: 6px 0; color: #1e293b; font-size: 14px; font-weight: 500;">${formatDate(policy.end_date)}</td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-size: 14px;">Days Until Expiry:</td>
-                    <td style="padding: 6px 0;">
-                      <span style="background: ${daysUntilExpiry <= 7 ? '#fef2f2' : '#fef9c3'}; color: ${daysUntilExpiry <= 7 ? '#dc2626' : '#ca8a04'}; padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 600;">${daysUntilExpiry} days</span>
+                    <td style="padding: 8px 0; color: #64748b; font-size: 14px; vertical-align: top;">Days Until Expiry:</td>
+                    <td style="padding: 8px 0;">
+                      <span style="display: inline-block; background: ${daysUntilExpiry <= 7 ? '#fef2f2' : daysUntilExpiry <= 14 ? '#fef9c3' : '#f0fdf4'}; color: ${daysUntilExpiry <= 7 ? '#dc2626' : daysUntilExpiry <= 14 ? '#ca8a04' : '#16a34a'}; padding: 6px 12px; border-radius: 16px; font-size: 13px; font-weight: 700;">${daysUntilExpiry} days</span>
                     </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 6px 0; color: #64748b; font-size: 14px;">Contact:</td>
-                    <td style="padding: 6px 0; color: #1e293b; font-size: 14px;">${policy.contact_name} · ${policy.contact_phone}</td>
                   </tr>
                 </table>
               </td>
@@ -345,7 +337,7 @@ function generateEmailBody(policies: Policy[]): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Policy Renewal Reminder</title>
+  <title>Policy Expiry Reminder</title>
 </head>
 <body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f1f5f9; padding: 40px 20px;">
@@ -355,26 +347,26 @@ function generateEmailBody(policies: Policy[]): string {
           <!-- Header -->
           <tr>
             <td style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); padding: 32px 40px; text-align: center;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">PolicyMinders</h1>
-              <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 14px;">Policy Renewal Reminder</p>
+              <h1 style="margin: 0; color: #ffffff; font-size: 26px; font-weight: 700; letter-spacing: -0.5px;">PolicyMinders</h1>
+              <p style="margin: 10px 0 0 0; color: rgba(255,255,255,0.95); font-size: 15px; font-weight: 500;">Renewal Reminder</p>
             </td>
           </tr>
           
           <!-- Body -->
           <tr>
             <td style="padding: 40px;">
-              <p style="margin: 0 0 24px 0; font-size: 16px; line-height: 1.6; color: #334155;">
-                The following ${policies.length === 1 ? 'policy is' : 'policies are'} approaching ${policies.length === 1 ? 'its' : 'their'} renewal date. Please review and take the necessary action.
+              <p style="margin: 0 0 28px 0; font-size: 16px; line-height: 1.7; color: #334155;">
+                This policy is approaching its expiry date. Please take action to renew it with the client.
               </p>
               
               ${policiesHtml}
               
               <!-- Call to Action -->
-              <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 24px; background: #eff6ff; border-radius: 8px; border-left: 4px solid #3b82f6;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="margin-top: 28px; background: #eff6ff; border-radius: 8px; border-left: 4px solid #3b82f6;">
                 <tr>
-                  <td style="padding: 16px 20px;">
-                    <p style="margin: 0; font-size: 14px; color: #1e40af; font-weight: 500;">
-                      📞 Contact your client to renew ${policies.length === 1 ? 'this policy' : 'these policies'} before ${policies.length === 1 ? 'it expires' : 'they expire'}.
+                  <td style="padding: 20px 24px;">
+                    <p style="margin: 0; font-size: 15px; color: #1e40af; font-weight: 600;">
+                      📞 Contact your client to renew ${policies.length === 1 ? 'this policy' : 'these policies'}.
                     </p>
                   </td>
                 </tr>
@@ -384,10 +376,10 @@ function generateEmailBody(policies: Policy[]): string {
           
           <!-- Footer -->
           <tr>
-            <td style="background: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0;">
-              <p style="margin: 0; font-size: 13px; color: #64748b; text-align: center;">
-                This is an automated reminder from <strong>PolicyMinders</strong>.<br>
-                © ${new Date().getFullYear()} PolicyMinders. All rights reserved.
+            <td style="background: #f8fafc; padding: 28px 40px; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0; font-size: 12px; color: #94a3b8; text-align: center; line-height: 1.6;">
+                This reminder was sent automatically by PolicyMinders.<br>
+                For support, contact your system admin.
               </p>
             </td>
           </tr>
