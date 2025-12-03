@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.83.0';
 
 // SendGrid helper function using fetch (more compatible with Deno)
-async function sendGridSend(apiKey: string, msg: { to: string; from: string; subject: string; text?: string; html?: string }) {
+async function sendGridSend(apiKey: string, msg: { to: string; from: { email: string; name: string }; subject: string; text?: string; html?: string }) {
   const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
     method: 'POST',
     headers: {
@@ -10,7 +10,7 @@ async function sendGridSend(apiKey: string, msg: { to: string; from: string; sub
     },
     body: JSON.stringify({
       personalizations: [{ to: [{ email: msg.to }] }],
-      from: { email: msg.from },
+      from: { email: msg.from.email, name: msg.from.name },
       subject: msg.subject,
       content: [
         ...(msg.text ? [{ type: 'text/plain', value: msg.text }] : []),
@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
       try {
         await sendGridSend(sendgridApiKey, {
           to: body.email,
-          from: fromEmail,
+          from: { email: fromEmail, name: 'PolicyMinders Alerts' },
           subject: 'PolicyMinders test email',
           text: 'This is a test from PolicyMinders via SendGrid.',
           html: '<p>This is a test from PolicyMinders via SendGrid.</p>',
@@ -230,7 +230,7 @@ Deno.serve(async (req) => {
     try {
       await sendGridSend(sendgridApiKey, {
         to: settings.notification_email,
-        from: fromEmail,
+        from: { email: fromEmail, name: 'PolicyMinders Alerts' },
         subject: 'Policies Expiring in 30 Days',
         html: emailBody,
       });
