@@ -80,6 +80,9 @@ export const policySchema = z.object({
   
   company_id: z.string().uuid().optional().nullable(),
   documents: z.array(z.string()).optional().nullable(),
+  reminder_lead_days: z.number().int().refine((val) => [14, 30, 45].includes(val), {
+    message: "Reminder must be 14, 30, or 45 days"
+  }).default(30),
 });
 
 export type PolicyFormData = z.infer<typeof policySchema>;

@@ -34,6 +34,7 @@ export const PoliciesTable = ({ policies, isLoading, onEdit, onDelete }: Policie
             <TableHead>Count</TableHead>
             <TableHead>Insurer</TableHead>
             <TableHead>Channel</TableHead>
+            <TableHead>Reminder</TableHead>
             <TableHead>Contact Person</TableHead>
             <TableHead className="text-right">Actions</TableHead>
           </TableRow>
@@ -49,6 +50,7 @@ export const PoliciesTable = ({ policies, isLoading, onEdit, onDelete }: Policie
               <TableCell>{policy.count || "-"}</TableCell>
               <TableCell>{policy.insurer_name}</TableCell>
               <TableCell className="capitalize">{policy.channel_type}</TableCell>
+              <TableCell>{policy.reminder_lead_days || 30} days</TableCell>
               <TableCell>
                 <div className="text-sm">
                   <div>{policy.contact_name}</div>
