@@ -137,6 +137,12 @@ serve(async (req) => {
                 </div>
               `,
             }],
+            tracking_settings: {
+              click_tracking: {
+                enable: false,
+                enable_text: false
+              }
+            }
           }),
         });
         console.log("[INVITATION] Email sent to:", email);
